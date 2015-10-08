@@ -9,30 +9,22 @@ import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
-import android.os.*;
 
 import com.felhr.usbserial.UsbSerialDevice;
 import com.felhr.usbserial.UsbSerialInterface;
 
 import java.io.UnsupportedEncodingException;
-import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
 
 public class MainActivity extends Activity {
-    //    public final String ACTION_USB_ATTACHED = "android.hardware.usb.action.USB_DEVICE_ATTACHED";
-//    public final String ACTION_USB_DETACHED = "android.hardware.usb.action.USB_DEVICE_DETACHED";
-    public static final int DATA_RECEIVED = 0;
-    public final String ACTION_USB_PERMISSION = "com.hariharan.arduinousb.USB_PERMISSON";
+    public final String ACTION_USB_PERMISSION = "com.hariharan.arduinousb.USB_PERMISSION";
     Button startButton, sendButton, clearButton, stopButton;
     TextView textView;
     EditText editText;
@@ -40,10 +32,8 @@ public class MainActivity extends Activity {
     UsbDevice device;
     UsbSerialDevice serialPort;
     UsbDeviceConnection connection;
-    Handler mHandler = new Handler();
 
-
-    UsbSerialInterface.UsbReadCallback mCallback = new UsbSerialInterface.UsbReadCallback() {
+    UsbSerialInterface.UsbReadCallback mCallback = new UsbSerialInterface.UsbReadCallback() { //Defining a Callback which triggers whenever data is read.
         @Override
         public void onReceivedData(byte[] arg0) {
             String data = null;
@@ -58,7 +48,7 @@ public class MainActivity extends Activity {
 
         }
     };
-    private final BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
+    private final BroadcastReceiver broadcastReceiver = new BroadcastReceiver() { //Broadcast Receiver to automatically start and stop the Serial connection.
         @Override
         public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(ACTION_USB_PERMISSION)) {
@@ -67,7 +57,7 @@ public class MainActivity extends Activity {
                     connection = usbManager.openDevice(device);
                     serialPort = UsbSerialDevice.createUsbSerialDevice(device, connection);
                     if (serialPort != null) {
-                        if (serialPort.open()) {
+                        if (serialPort.open()) { //Set Serial Connection Parameters.
                             setUiEnabled(true);
                             serialPort.setBaudRate(9600);
                             serialPort.setDataBits(UsbSerialInterface.DATA_BITS_8);
@@ -75,6 +65,7 @@ public class MainActivity extends Activity {
                             serialPort.setParity(UsbSerialInterface.PARITY_NONE);
                             serialPort.setFlowControl(UsbSerialInterface.FLOW_CONTROL_OFF);
                             serialPort.read(mCallback);
+                            tvAppend(textView,"Serial Connection Opened!\n");
 
                         } else {
                             Log.d("SERIAL", "PORT NOT OPEN");
@@ -85,6 +76,11 @@ public class MainActivity extends Activity {
                 } else {
                     Log.d("SERIAL", "PERM NOT GRANTED");
                 }
+            } else if (intent.getAction().equals(UsbManager.ACTION_USB_DEVICE_ATTACHED)) {
+                onClickStart(startButton);
+            } else if (intent.getAction().equals(UsbManager.ACTION_USB_DEVICE_DETACHED)) {
+                onClickStop(stopButton);
+
             }
         }
 
@@ -105,8 +101,8 @@ public class MainActivity extends Activity {
         setUiEnabled(false);
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_USB_PERMISSION);
-//        filter.addAction(ACTION_USB_DETACHED);
-//        filter.addAction(ACTION_USB_ATTACHED);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         registerReceiver(broadcastReceiver, filter);
 
 
@@ -115,7 +111,6 @@ public class MainActivity extends Activity {
     public void setUiEnabled(boolean bool) {
         startButton.setEnabled(!bool);
         sendButton.setEnabled(bool);
-        clearButton.setEnabled(bool);
         stopButton.setEnabled(bool);
         textView.setEnabled(bool);
 
@@ -129,7 +124,6 @@ public class MainActivity extends Activity {
             for (Map.Entry<String, UsbDevice> entry : usbDevices.entrySet()) {
                 device = entry.getValue();
                 int deviceVID = device.getVendorId();
-                int devicePID = device.getProductId();
                 if (deviceVID == 0x2341)//Arduino Vendor ID
                 {
                     PendingIntent pi = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
@@ -151,9 +145,15 @@ public class MainActivity extends Activity {
     public void onClickSend(View view) {
         String string = editText.getText().toString();
         serialPort.write(string.getBytes());
+        tvAppend(textView, "\nData Sent : " + string + "\n");
+
     }
 
     public void onClickStop(View view) {
+        setUiEnabled(false);
+        serialPort.close();
+        tvAppend(textView,"\nSerial Connection Closed! \n");
+
     }
 
     public void onClickClear(View view) {
